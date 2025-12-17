@@ -1,0 +1,27 @@
+{
+  "name": "lll-device-orchestrator-humanoid-server",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Orchestrator plugin humanoid server",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "pm2 start pluginHumanoid.json",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.19.3",
+    "@types/ws": "^8.18.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
