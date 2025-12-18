@@ -82,14 +82,11 @@ export class WebSocketManager {
     }, this.HEARTBEAT_INTERVAL)
   }
 
-  public broadcast(message: MessageClient, excludeClientId?: string): void {
+  public broadcast(message: MessageClient): void {
     const messageStr = JSON.stringify(message)
 
-    this.clients.forEach((client, clientId) => {
-      if (
-        client.ws.readyState === WebSocket.OPEN &&
-        clientId !== excludeClientId
-      ) {
+    this.clients.forEach((client) => {
+      if (client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(messageStr)
       }
     })
