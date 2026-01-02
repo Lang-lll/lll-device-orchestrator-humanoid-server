@@ -36,7 +36,7 @@ export function createHumanoidServer(orchestratorUrl: string): {
         to_plugin: 'cognitive_core',
         message: data,
       },
-    })
+    }).catch((err) => void console.log(err))
   })
 
   // 健康检查端点
