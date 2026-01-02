@@ -7,7 +7,8 @@ import { WebSocketManager } from './WebSocketManager'
 import { pluginMetadata } from './constants'
 import type { Express, Request, Response } from 'express'
 
-const HEARTBEAT_INTERVAL = 300000
+const HEARTBEAT_INTERVAL = 30000
+axios.defaults.timeout = 30000
 
 export function createHumanoidServer(orchestratorUrl: string): {
   close: () => void
@@ -130,13 +131,9 @@ export function createHumanoidServer(orchestratorUrl: string): {
     close()
   })
 
-  return {
-    listen(...args) {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval)
-      }
-
-      heartbeatInterval = setInterval(() => {
+  const runHeartbeat = () => {
+    heartbeatInterval = setTimeout(async () => {
+      try {
         /** 超过3次没心跳响应时间，断开连接 */
         if (
           isRegistered &&
@@ -147,18 +144,18 @@ export function createHumanoidServer(orchestratorUrl: string): {
         }
 
         if (isRegistered) {
-          axios({
+          await axios({
             method: 'post',
             url: orchestratorUrl,
             data: {
               type: 'heartbeat',
               plugin_name: pluginMetadata.plugin_name,
             },
-          }).then(() => {
-            lastHeartbeatTime = new Date()
           })
+
+          lastHeartbeatTime = new Date()
         } else {
-          axios({
+          await axios({
             method: 'post',
             url: orchestratorUrl,
             data: {
@@ -167,7 +164,21 @@ export function createHumanoidServer(orchestratorUrl: string): {
             },
           })
         }
-      }, HEARTBEAT_INTERVAL)
+      } catch (e) {
+        console.error(e)
+      } finally {
+        runHeartbeat()
+      }
+    }, HEARTBEAT_INTERVAL)
+  }
+
+  return {
+    listen(...args) {
+      if (heartbeatInterval) {
+        clearTimeout(heartbeatInterval)
+      }
+
+      runHeartbeat()
 
       return server.listen(...(args as any))
     },

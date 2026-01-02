@@ -79,6 +79,7 @@ export class WebSocketManager {
   private startHeartbeat(): void {
     this.heartbeatInterval = setInterval(() => {
       this.checkConnections()
+      this.sendHeartbeat()
     }, this.HEARTBEAT_INTERVAL)
   }
 
@@ -133,6 +134,18 @@ export class WebSocketManager {
         client.ws.terminate()
         this.clients.delete(clientId)
       }
+    })
+  }
+
+  private sendHeartbeat(): void {
+    this.clients.forEach((client, clientId) => {
+      client.ws.send('heartbeat', (err) => {
+        if (err) {
+          this.clients.delete(clientId)
+
+          console.log(`Client ${clientId} heartbeat error`, err)
+        }
+      })
     })
   }
 
