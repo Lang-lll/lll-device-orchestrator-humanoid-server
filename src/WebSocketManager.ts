@@ -5,12 +5,15 @@ import type { MessagesDataItem, WebSocketClient, MessageClient } from './types'
 export class WebSocketManager {
   private wss: WebSocketServer
   private clients: Map<string, WebSocketClient>
-  private onSendToOrchestrator?: (data: any) => void
+  private onSendToOrchestrator?: (data: any) => Promise<boolean>
   private heartbeatInterval: NodeJS.Timeout | null = null
   private readonly HEARTBEAT_INTERVAL = 40000 // 40秒心跳检查间隔
   private readonly CONNECTION_TIMEOUT = 80000 // 80秒无响应断开
 
-  constructor(server: HTTPServer, onSendToOrchestrator?: (data: any) => void) {
+  constructor(
+    server: HTTPServer,
+    onSendToOrchestrator?: (data: any) => Promise<boolean>
+  ) {
     this.wss = new WebSocketServer({ server })
     this.clients = new Map()
     this.onSendToOrchestrator = onSendToOrchestrator
@@ -48,11 +51,19 @@ export class WebSocketManager {
             return
           }
 
+          if (!this.onSendToOrchestrator) {
+            return
+          }
+
           // 解析消息
           let parsedData = JSON.parse(message)
 
           // 转发到外部服务
-          this.onSendToOrchestrator?.(parsedData)
+          const success = await this.onSendToOrchestrator(parsedData)
+
+          if (success) {
+            this.receiveData(parsedData, 'pilot')
+          }
         } catch (error) {
           console.error('Error processing message:', error)
         }
@@ -94,11 +105,16 @@ export class WebSocketManager {
   }
 
   // 从HTTP接口接收消息
-  public receiveData(message: MessagesDataItem): boolean {
+  public receiveData(
+    message: MessagesDataItem,
+    source: 'pilot' | 'humanoid'
+  ): boolean {
     const webSocketMessage: MessageClient = {
       id: this.generateMessageId(),
+      type: message.type,
       data: message,
       timestamp: new Date().toISOString(),
+      source,
     }
 
     this.broadcast(webSocketMessage)

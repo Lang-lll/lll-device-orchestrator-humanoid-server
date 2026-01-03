@@ -28,15 +28,22 @@ export function createHumanoidServer(orchestratorUrl: string): {
 
   // 创建WebSocket管理器
   const wsManager = new WebSocketManager(server, (data) => {
-    axios({
-      method: 'post',
-      url: orchestratorUrl,
-      data: {
-        type: 'publish',
-        to_plugin: 'cognitive_core',
-        message: data,
-      },
-    }).catch((err) => void console.log(err))
+    return new Promise((resolve) => {
+      axios({
+        method: 'post',
+        url: orchestratorUrl,
+        data: {
+          type: 'publish',
+          to_plugin: 'cognitive_core',
+          message: data,
+        },
+      })
+        .then(() => void resolve(true))
+        .catch((err) => {
+          console.log(err)
+          resolve(false)
+        })
+    })
   })
 
   // 健康检查端点
@@ -69,7 +76,7 @@ export function createHumanoidServer(orchestratorUrl: string): {
         return
       }
 
-      const success = wsManager.receiveData(req.body)
+      const success = wsManager.receiveData(req.body, 'humanoid')
 
       if (success) {
         res.json({

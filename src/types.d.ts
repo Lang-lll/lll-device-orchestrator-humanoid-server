@@ -17,8 +17,10 @@ export interface MessagesDataItem {
 
 export interface MessageClient {
   id: string
+  type: string
   data: MessagesDataItem
   timestamp: string
+  source: 'pilot' | 'humanoid'
 }
 
 export interface PluginMetadata {
