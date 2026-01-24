@@ -26,23 +26,39 @@ export function createHumanoidServer(orchestratorUrl: string): {
   app.use(express.json())
   app.use(express.urlencoded({ extended: true }))
 
+  // TODO: 断连
+  const sendMessageToOrchestrator = (
+    message: any,
+    options?: { onSuccess?: () => void; onError?: (e: any) => void },
+  ) => {
+    const { onSuccess, onError } = options || {}
+    axios({
+      method: 'post',
+      url: orchestratorUrl,
+      data: {
+        type: 'publish',
+        to_plugin: ['cognitive_core'],
+        message,
+      },
+    })
+      .then(() => void onSuccess?.())
+      .catch((err) => {
+        console.log(err)
+        onError?.(err)
+      })
+  }
+
   // 创建WebSocket管理器
   const wsManager = new WebSocketManager(server, (data) => {
     return new Promise((resolve) => {
-      axios({
-        method: 'post',
-        url: orchestratorUrl,
-        data: {
-          type: 'publish',
-          to_plugin: 'cognitive_core',
-          message: data,
+      sendMessageToOrchestrator(data, {
+        onSuccess() {
+          resolve(true)
+        },
+        onError() {
+          resolve(false)
         },
       })
-        .then(() => void resolve(true))
-        .catch((err) => {
-          console.log(err)
-          resolve(false)
-        })
     })
   })
 
@@ -66,13 +82,31 @@ export function createHumanoidServer(orchestratorUrl: string): {
   // 接收orchestrator的消息
   app.post('/webhook/orchestrator', async (req: Request, res: Response) => {
     try {
-      if (typeof req.body === 'object' && req.body.cmd === 'registered') {
+      if (typeof req.body === 'object' && req.body.type === 'registered') {
         isRegistered = true
 
         res.json({
           success: true,
           message: 'ok',
         })
+
+        // 首次连接更新状态
+        sendMessageToOrchestrator({
+          type: 'publish_status',
+        })
+        console.log('接收到注册消息', req.body)
+        return
+      } else if (
+        typeof req.body === 'object' &&
+        req.body.type === 'heartbeat'
+      ) {
+        lastHeartbeatTime = new Date()
+
+        res.json({
+          success: true,
+          message: 'ok',
+        })
+        console.log('接收到心跳消息', req.body)
         return
       }
 
@@ -138,45 +172,47 @@ export function createHumanoidServer(orchestratorUrl: string): {
     close()
   })
 
-  const runHeartbeat = () => {
-    heartbeatInterval = setTimeout(async () => {
-      try {
-        /** 超过3次没心跳响应时间，断开连接 */
-        if (
-          isRegistered &&
-          new Date().getTime() - lastHeartbeatTime.getTime() >
-            HEARTBEAT_INTERVAL * 3
-        ) {
-          isRegistered = false
-        }
-
-        if (isRegistered) {
-          await axios({
-            method: 'post',
-            url: orchestratorUrl,
-            data: {
-              type: 'heartbeat',
-              plugin_name: pluginMetadata.plugin_name,
-            },
-          })
-
-          lastHeartbeatTime = new Date()
-        } else {
-          await axios({
-            method: 'post',
-            url: orchestratorUrl,
-            data: {
-              type: 'register',
-              ...pluginMetadata,
-            },
-          })
-        }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        runHeartbeat()
+  const pluginCheck = async () => {
+    try {
+      /** 超过3次没心跳响应时间，断开连接 */
+      if (
+        isRegistered &&
+        new Date().getTime() - lastHeartbeatTime.getTime() >
+          HEARTBEAT_INTERVAL * 3
+      ) {
+        isRegistered = false
       }
-    }, HEARTBEAT_INTERVAL)
+
+      if (isRegistered) {
+        console.log('发送Orchestrator心跳消息')
+        await axios({
+          method: 'post',
+          url: orchestratorUrl,
+          data: {
+            type: 'heartbeat',
+            plugin_name: pluginMetadata.plugin_name,
+          },
+        })
+      } else {
+        console.log('发送Orchestrator注册消息')
+        await axios({
+          method: 'post',
+          url: orchestratorUrl,
+          data: {
+            type: 'register',
+            message: pluginMetadata,
+          },
+        })
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      runHeartbeat()
+    }
+  }
+
+  const runHeartbeat = () => {
+    heartbeatInterval = setTimeout(pluginCheck, HEARTBEAT_INTERVAL)
   }
 
   return {
@@ -185,7 +221,9 @@ export function createHumanoidServer(orchestratorUrl: string): {
         clearTimeout(heartbeatInterval)
       }
 
-      runHeartbeat()
+      setTimeout(() => {
+        pluginCheck()
+      })
 
       return server.listen(...(args as any))
     },

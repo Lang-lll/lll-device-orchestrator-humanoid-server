@@ -12,7 +12,7 @@ export class WebSocketManager {
 
   constructor(
     server: HTTPServer,
-    onSendToOrchestrator?: (data: any) => Promise<boolean>
+    onSendToOrchestrator?: (data: any) => Promise<boolean>,
   ) {
     this.wss = new WebSocketServer({ server })
     this.clients = new Map()
@@ -107,7 +107,7 @@ export class WebSocketManager {
   // 从HTTP接口接收消息
   public receiveData(
     message: MessagesDataItem,
-    source: 'pilot' | 'humanoid'
+    source: 'pilot' | 'humanoid',
   ): boolean {
     const webSocketMessage: MessageClient = {
       id: this.generateMessageId(),
