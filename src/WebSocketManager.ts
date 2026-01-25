@@ -61,8 +61,9 @@ export class WebSocketManager {
           // 转发到外部服务
           const success = await this.onSendToOrchestrator(parsedData)
 
-          if (success) {
-            this.receiveData(parsedData, 'pilot')
+          // FIXME: 不需要接收的事件
+          if (success && parsedData.type === 'text') {
+            this.receiveData({ type: 'action', data: parsedData }, 'pilot')
           }
         } catch (error) {
           console.error('Error processing message:', error)

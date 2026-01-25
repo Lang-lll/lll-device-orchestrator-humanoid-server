@@ -8,11 +8,14 @@ export interface WebSocketClient {
 }
 
 export interface MessagesDataItem {
-  type: 'tts' | 'text' | 'motor' | 'wait'
-  data?: string
-  action_id?: string
-  action_data?: any
-  duration?: number
+  type: string
+  data: {
+    type: 'tts' | 'text' | 'motor' | 'wait'
+    data?: string
+    action_id?: string
+    action_data?: any
+    duration?: number
+  }
 }
 
 export interface MessageClient {
